@@ -1,0 +1,13 @@
+Pinecone is a managed vector database designed for storing and querying high-dimensional
+embeddings at scale. It is commonly used in machine learning applications such as semantic
+search, recommendation systems, and Retrieval-Augmented Generation pipelines.
+
+In a typical setup, embeddings are generated outside of Pinecone using models such as
+sentence-transformers from HuggingFace. These embeddings are then upserted into a Pinecone
+index, where each vector can be associated with metadata like document name, chunk ID,
+or source type.
+
+Using HuggingFace embeddings instead of proprietary APIs helps avoid vendor lock-in and
+reduces cost during development. Pinecone remains embedding-agnostic, meaning it does not
+care how the vectors were generated as long as the vector dimensions match the index
+configuration.

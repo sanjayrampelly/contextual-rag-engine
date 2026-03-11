@@ -1,0 +1,11 @@
+langchain
+langchain-community
+langchain-text-splitters
+python-dotenv
+langchain_huggingface
+openai
+pinecone
+tiktoken
+sentence-transformers
+groq
+rank-bm25

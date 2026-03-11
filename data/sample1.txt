@@ -1,0 +1,14 @@
+Retrieval-Augmented Generation (RAG) is a technique that combines information retrieval
+with text generation models. Instead of relying only on a model’s internal knowledge,
+RAG retrieves relevant documents from an external knowledge base and uses them as context
+during generation.
+
+The RAG pipeline usually consists of four main steps. First, documents are ingested from
+various sources such as text files, PDFs, or databases. Second, the documents are split
+into smaller chunks to fit within the context window of language models. Third, each chunk
+is converted into a vector representation using an embedding model. Finally, these vectors
+are stored in a vector database for efficient similarity search.
+
+Embeddings capture the semantic meaning of text rather than exact keywords. This allows
+the system to retrieve relevant information even when the user query uses different wording
+from the original document. Popular vector databases include Pinecone, FAISS, and Weaviate.
