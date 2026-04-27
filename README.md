@@ -1,5 +1,6 @@
 # Contextual_RAG_Engine 
 
+
 Contextual_RAG_Engine  is a production-oriented **Retrieval-Augmented Generation (RAG) system** designed to generate accurate, context-grounded responses using semantic retrieval, metadata filtering, and hybrid reranking.
 
 The system retrieves relevant knowledge from a vector database and generates answers using an LLM while applying strict filtering and ranking strategies to reduce hallucinations and improve precision.
