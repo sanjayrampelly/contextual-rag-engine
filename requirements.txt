@@ -1,9 +1,8 @@
 langchain
 langchain-community
 langchain-text-splitters
-python-dotenv
 langchain_huggingface
-openai
+python-dotenv
 pinecone
 tiktoken
 sentence-transformers

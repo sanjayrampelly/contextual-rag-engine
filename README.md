@@ -1,89 +1,96 @@
-# Contextual_RAG_Engine 
+# Contextual RAG Engine
 
+A modular Retrieval-Augmented Generation pipeline that combines dense vector
+search, metadata filtering, and hybrid (vector + BM25) reranking on top of
+Pinecone, with answer generation by a Groq-hosted LLM. The system is designed
+to demonstrate the building blocks of a real RAG service, not to be a
+plug-and-play API.
 
-Contextual_RAG_Engine  is a production-oriented **Retrieval-Augmented Generation (RAG) system** designed to generate accurate, context-grounded responses using semantic retrieval, metadata filtering, and hybrid reranking.
+## What it does
 
-The system retrieves relevant knowledge from a vector database and generates answers using an LLM while applying strict filtering and ranking strategies to reduce hallucinations and improve precision.
+1. **Ingest** plain-text documents from `data/`, chunk them with a recursive
+   character splitter, attach metadata (`doc_id`, `chunk_id`, `source`,
+   `chunk_index`, `category`, `text`), and upsert into Pinecone.
+2. **Retrieve** the top-k most similar chunks for a query, with an optional
+   Pinecone metadata filter (used here to disambiguate "Pinecone the vector
+   database" from "pinecones the seed cones of a pine tree").
+3. **Rerank** retrieved chunks using one of four strategies (see below).
+4. **Generate** an answer with Groq using only the top-N reranked chunks as
+   context. If no chunk clears the score threshold, the system declines to
+   answer.
 
-The project is implemented as a **FastAPI service**, allowing the RAG engine to be accessed through REST APIs.
+## Reranking strategies
 
----
+| Strategy           | File                                | Notes                                                  |
+| ------------------ | ----------------------------------- | ------------------------------------------------------ |
+| `SimpleReranker`   | `retrieval/reranker.py`             | Score + length weighting.                              |
+| `KeywordRanker`    | `retrieval/keyword_reranker.py`     | Token-overlap with the query.                          |
+| `BM25Reranker`     | `retrieval/bm25_ranker.py`          | `rank-bm25` (BM25Okapi).                               |
+| `HybridReranker`   | `retrieval/hybrid_reranker.py`      | Min-max normalises vector + BM25, then weighted sum.   |
 
-# Key Features
+The hybrid reranker is the default used by `retrieval/retrieval.py`.
 
-### Retrieval Pipeline
-- Semantic search using vector embeddings
-- Vector storage with Pinecone
-- Metadata-aware retrieval
-- Category filtering to remove irrelevant documents
+## Hallucination guard
 
-### Ranking Improvements
-- Score threshold filtering
-- Hybrid reranking (semantic similarity + keyword relevance)
-- Context prioritization
+After reranking, chunks below `MIN_SCORE` (0.60) are dropped. If nothing
+survives, the generator is fed an empty context and the prompt instructs it
+to reply *"I don't know based on the provided documents."* rather than
+fabricate an answer.
 
-### Generation Layer
-- Context-grounded response generation
-- Hallucination guard when context is insufficient
-- Structured output
+## Tech stack
 
-### API Layer
-- FastAPI service exposing the RAG pipeline
-- Request / response schemas with validation
-- Interactive Swagger documentation
+- Python 3.10+
+- Pinecone (vector store)
+- HuggingFace `sentence-transformers` via `langchain-huggingface`
+  (`BAAI/bge-small-en-v1.5`)
+- `langchain-text-splitters` (recursive character splitter)
+- `rank-bm25` (BM25Okapi)
+- Groq (LLM, defaults to `llama3-8b-8192`)
+- `python-dotenv`
 
----
+## Project structure
 
-# System Architecture
-
-User Query  
-↓  
-Query Embedding (HuggingFace)  
-↓  
-Pinecone Vector Search  
-↓  
-Metadata Filtering  
-↓  
-Hybrid Reranking  
-↓  
-Context Assembly  
-↓  
-LLM Generation (Groq)  
-↓  
-API Response  
-
----
-
-# Tech Stack
-
-### Backend
-- Python
-- FastAPI
-
-### Vector Retrieval
-- Pinecone
-
-### Embeddings
-- HuggingFace sentence-transformers
-
-### LLM Generation
-- Groq API
-
-### Utilities
-- python-dotenv
-- Pydantic
-
----
-
-
-# Hallucination Guard
-
-If the retrieval pipeline cannot find relevant context above the score threshold, the system returns:
-
-```
-No relevant information found in the knowledge base.
+```text
+contextual-rag-engine/
+├── chunking/         # text splitter wrapper
+├── data/             # sample .txt documents
+├── embeddings/       # HuggingFace embeddings wrapper
+├── generation/       # Groq LLM with strict grounding prompt
+├── ingestion/        # ingest.py: chunk -> embed -> upsert
+├── retrieval/        # retrieve, rerankers, end-to-end query script
+├── storage/          # filesystem storage abstraction
+└── vectorstore/      # Pinecone wrapper (upsert, delete_by_source)
 ```
 
-This prevents the LLM from generating unsupported answers.
+## Setup
 
----
+```bash
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env             # fill in PINECONE_API_KEY, GROQ_API_KEY, ...
+```
+
+## Run
+
+From the project root (so the imports resolve):
+
+```bash
+# 1. Ingest sample data into Pinecone
+python -m ingestion.ingest
+
+# 2. Run an end-to-end query
+python -m retrieval.retrieval
+```
+
+## Notes and limitations
+
+- This is a script-driven engine, not an HTTP service. There is no FastAPI
+  app yet; wiring one on top of `retrieval.run_query()` is the natural next
+  step.
+- No automated tests at the moment. The hybrid reranker's normalisation logic
+  is the obvious first thing to cover.
+- `data/sample3.txt` is intentionally a document about *botanical* pine
+  cones; it is used to validate that the metadata filter
+  `{"category": {"$ne": "pinecone_nature"}}` correctly excludes off-topic
+  matches.

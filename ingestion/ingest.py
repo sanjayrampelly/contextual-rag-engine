@@ -1,12 +1,15 @@
-from openai import embeddings
-from storage.local import LocalStorage
-from chunking.splitter import TextSplitter
-from vectorstore.pinecone_store import PineconeStore
-from embeddings.embeder import Embeder
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+
+from chunking.splitter import TextSplitter
+from embeddings.embeder import Embeder
+from storage.local import LocalStorage
+from vectorstore.pinecone_store import PineconeStore
+
 load_dotenv()
 
+# Manual mapping of source files to logical categories. Anything not in this
+# map falls back to keyword-based detection.
 CATEGORY_MAP = {
     "sample1.txt": "rag",
     "sample2.txt": "pinecone_db",
@@ -30,47 +33,24 @@ def detect_category_from_text(text: str) -> str:
 
 
 def main():
-    all_chunks = []
-    all_metadatas = []
     storage = LocalStorage()
     splitter = TextSplitter()
     embeder = Embeder()
     vector_store = PineconeStore(index_name=os.getenv("PINECONE_INDEX"))
+
     files = storage.list_files()
     print("Files found:", files)
 
     for file in files:
         content = storage.read_file(file)
-        # print(f"\n--- {file} ---")
-        # print(content[:200])  # preview
         chunks = splitter.chunk_text(content)
-        # print(f"Chunks preview: {chunks[:2]}")  # preview first 2 chunks
-        # print(f"Number of chunks: {len(chunks)}")
-        # for i, c in enumerate(chunks[:2]):
-        #     print(f"Chunk {i} length: {len(c)}")
-        # for i, c in enumerate(chunks):
-        #     all_chunks.append(c)
-        #     all_metadatas.append({"source": file, "chunk_index": i,"text": c})
-        # embeddings = embeder.embed_documents(all_chunks)
-        # vector_store.upsert(embeddings, all_metadatas)
-        # all_chunks.extend(chunks)
-        vectors = []
+
         file_category = CATEGORY_MAP.get(file)
         embeddings = embeder.embed_documents(chunks)
+
+        vectors = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            
-            category= file_category or detect_category_from_text(chunk)
-            # vector_id = f"{file}_chunk_{i}"
-            # vectors.append({
-            #     "id": vector_id,          //for index in v1
-            #     "values": embedding,
-            #     "metadata": {
-            #         "doc_id": file,
-            #         "source": file,
-            #         "chunk_index": i,
-            #         "text": chunk
-            #     }
-            # })
+            category = file_category or detect_category_from_text(chunk)
 
             doc_id = file.replace(".txt", "")
             chunk_id = f"{doc_id}_chunk_{i}"
@@ -84,17 +64,13 @@ def main():
                     "chunk_index": i,
                     "chunk_id": chunk_id,
                     "category": category,
-                    "text": chunk
-                }
+                    "text": chunk,
+                },
             })
 
         vector_store.upsert(vectors)
 
     print("Ingestion complete.")
-        
-   
-
-    
 
 
 if __name__ == "__main__":
